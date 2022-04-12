@@ -40,3 +40,64 @@ It might not be the fastest way to implement an in-order traversal in Go--an exp
 
 I would have expected Go to do tail-call optimisation here, but at the time of writing, it [looks to me like the assembly uses function calls instead of jumps](https://godbolt.org/z/YjeajnEGh), so we would still use lots of stack space for large trees in this language.
 
+If we are implementing a trampoline anyway, we might as well turn the traversal into an iterator (of a sort) at the same time, and get the visited nodes one at a time while we traverse.
+
+We don't have union types in Go, but we need a way to specify that we have a new value, and a way to specify that the iteration is over, and we can use pointers (`*`) for both. A value of `nil` then means that we don't have a value, or that the iteration is over. We define a thunk as something that returns a pointer to a result (with `nil` to indicate that we are done) and a result consists of a thunk to compute the next value and a pointer to a value (with `nil` indicating that we don't have a value yet).
+
+```go
+type thunk[T any] func() *result[T]
+type result[T any] struct {
+	next thunk[T]
+	val  *T
+}
+```
+
+If we move the inner functions out of `inorder()` things look a little simpler. The function we call when are done with the right tree shoudl just give us the original continuation back:
+
+```go
+func handleRight[T any](t *node[T], k thunk[T]) thunk[T] {
+	return func() *result[T] {
+		return &result[T]{next: k}
+	}
+}
+```
+
+The function that is called when we have traversed the left tree should give us the node's value together with a thunk that traverses the right tree:
+
+```go
+func handleLeft[T any](t *node[T], k thunk[T]) thunk[T] {
+	return func() *result[T] {
+		return &result[T]{
+			next: func() *result[T] { return inorder(t.right, handleRight(t, k)) },
+			val:  &t.value,
+		}
+	}
+}
+```
+
+and the `inorder()` function simplifies to handling leaves, by defering to the continuation, and recursing left otherwise.
+
+```go
+func inorder[T any](t *node[T], k thunk[T]) *result[T] {
+	if t == nil {
+		return &result[T]{next: k}
+	}
+
+	return &result[T]{
+		next: func() *result[T] { return inorder(t.left, handleLeft(t, k)) }}
+}
+```
+
+You can use it to traverse a tree like this:
+
+```go
+	res := inorder(tree, func() *result[string] { return nil })
+	for ; res != nil; res = res.next() {
+		if res.val != nil {
+			fmt.Printf("%s ", *res.val)
+		}
+	}
+	fmt.Println()
+```
+
+see `trampoline.go` for the full implementation.
