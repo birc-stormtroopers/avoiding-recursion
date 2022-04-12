@@ -2,19 +2,19 @@ package main
 
 import "fmt"
 
-type node struct {
-	value string
-	left  *node
-	right *node
+type node[T any] struct {
+	value T
+	left  *node[T]
+	right *node[T]
 }
 
-func inorder(t *node, k func([]string) []string) []string {
+func inorder[T any](t *node[T], k func([]T) []T) []T {
 	if t == nil {
-		return k([]string{})
+		return k([]T{})
 	}
 
-	handleValueAndRight := func(left []string) []string {
-		handleRight := func(right []string) []string {
+	handleValueAndRight := func(left []T) []T {
+		handleRight := func(right []T) []T {
 			left = append(left, t.value)
 			return k(append(left, right...))
 		}
@@ -25,13 +25,13 @@ func inorder(t *node, k func([]string) []string) []string {
 }
 
 func main() {
-	tree := &node{"A",
-		&node{"B",
-			&node{"D", nil, &node{"H", nil, nil}},
-			&node{"E", nil, nil}},
-		&node{"C",
-			&node{"F", nil, nil},
-			&node{"G", &node{"I", nil, nil}, &node{"J", nil, nil}}},
+	tree := &node[string]{"A",
+		&node[string]{"B",
+			&node[string]{"D", nil, &node[string]{"H", nil, nil}},
+			&node[string]{"E", nil, nil}},
+		&node[string]{"C",
+			&node[string]{"F", nil, nil},
+			&node[string]{"G", &node[string]{"I", nil, nil}, &node[string]{"J", nil, nil}}},
 	}
 	fmt.Println(inorder(tree, func(x []string) []string { return x }))
 }

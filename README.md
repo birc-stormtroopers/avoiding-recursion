@@ -468,7 +468,7 @@ tree = Node(
 )
 ```
 
-(There are some potential GC issues here, and if you buy my book I will tell you what they are. Otherwise, you can ignore them, they will never be a real problem).
+(There are some potential GC issues here, and if you buy my book I will tell you what they are. Otherwise, you can ignore them; they will never be a real problem).
 
 **Exercise:** Try to write a traversal algorithm that uses the `parent` pointer.
 
