@@ -272,3 +272,7 @@ Each continuation you write does one step of the calculation and returns a thunk
 
 Your milage may vary.
 
+**Exercise:** In languages that do not have generators or co-routines, like Python does, this kind of computation is one way to get a similar effect. When we traverse the tree, we return thunks every time we have taken a step in the computation. But if we are returning from a call anyway, we could return more than a thunk. Try implementing a trampoline that lets you iterate over the nodes of a tree, in order.
+
+You can see my solution in `python/trampoline-generator.py`.
+
