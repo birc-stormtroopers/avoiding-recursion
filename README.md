@@ -276,3 +276,157 @@ Your milage may vary.
 
 You can see my solution in `python/trampoline-generator.py`.
 
+## Threading trees
+
+Even better than CPS or stacks would be if we could just run through the nodes in the tree, in the right order, by jumping from pointer to pointer. Wouldn't this be cool?
+
+```python
+def traverse(t: Tree[T]) -> Iterator[T]:
+    """In-order traversal following threads."""
+    while t:
+        yield t.value
+        t = t.next
+```
+
+Sometimes, we can actually manage that, especially with trees. (And sometimes we can even do it without using extra memory, but we won't go into details about that. I will show you one way that doesn't use extra memory, but it does have some other drawbacks...)
+
+The idea is to extend the tree with the right points. For example, we could just point from each node to the one that follows it in order. For our example tree, it could look like this:
+
+![Threaded tree](figs/figs/Threaded-tree.png)
+
+A tree like this is sometimes called a *threaded tree*, and there are different kinds of these depending on how it is threaded. We don't need to go into classification of trees here, but if you look at the figure you will see that if you start at the node pointed to by **Start ->** and follow the red pointers until the end, you will have visited all the nodes in the right order.
+
+We can't put the **Start** pointer in the root--it is already pointing somewhere else--but we can easily put it somewhere where we can get to it. We can also notice that for in-order traversal, we always start in the left-most node, so we can get to the starting point with this function:
+
+```python
+def leftmost(t: Tree[T]) -> Tree[T]:
+    if t is None:
+        return None
+    while t.left:
+        t = t.left
+    return t
+```
+
+and from there on traverse the nodes with this generator:
+
+```python
+def thread_traverse(t: Tree[T]) -> Iterator[T]:
+    """In-order traversal following threads."""
+    t = leftmost(t)
+    while t:
+        yield t.value
+        t = t.thread
+```
+
+We need to add the `thread` pointers to the tree, but that is the easiest point:
+
+```python
+@dataclass
+class Node(Generic[T]):
+    """Inner node of a (left-)threaded tree."""
+
+    value: T
+    left: Tree[T] = None
+    right: Tree[T] = None
+    thread: Tree[T] = None  # points to the next node in order
+```
+
+I'll show you shortly how to set these pointers, but first I want to show you a trick for traversing the tree *without* these thread pointers, but by (sort of) computing them on the fly. This is know as *Morris* traversal.
+
+The idea is this: when you first get to a new, say node `B` in the figure below, you run down to the right-most child in the left sub-tree (node `H` here) and you set its pointer to `B`. A right-most node will never have a right child, so you don't even need extra space for a new pointer; you can use the `right` pointer you already have.
+
+![Morris traversal](figs/figs/Morris-traversal.png)
+
+When you have done that, you can go left and start traversing the left sub-tree. You don't need to remember `B` on the stack, because once you are all the way though the sub-tree you are going to follow `H`'s right child and that will bring you right up to `B` again.
+
+Of course, if you don't notice that you return to `B` from its sub-tree, you might do the same thing again, and cycle through this tree from now to infinity, but there is a way to discover that you have already been there.
+
+When you search for the right-most tree, keep track of where you start the search. You will be following `right` pointers and if you see the node you started in when you are doing that, you know that you are back at a node you have already visited. When that happens, you can remove `H`'s pointer again, so we can distinguish between nodes that have right children or not, and you can go and explore the sub-tree on the right.
+
+You can implement Morris traversal like this:
+
+```python
+def rightmost(t: Node[T], sentinel: Tree[T]) -> Node[T]:
+    """Find the right-most node under t."""
+    while t.right and t.right != sentinel:
+        t = t.right
+    return t
+
+
+def morris_traversal(t: Tree[T]) -> Iterator[T]:
+    """In-order traversal of t."""
+    while t:
+        if not t.left:
+            # We can't go left, so emit and go right
+            yield t.value
+            t = t.right
+        else:
+            # We can go left, so fetch the rightmost to prepare
+            right = rightmost(t.left, t)
+            if right.right == t:
+                # If right.right points here, we must have
+                # returned here through a traversal, so
+                # yield the value and go right
+                yield t.value
+                right.right = None
+                t = t.right
+            else:
+                # We are not in a loop, so remember
+                # the thread and go left.
+                right.right = t
+                t = t.left
+```
+
+It's not pretty, but it works.
+
+The running time is linear in the tree. You do have to search down along the rightmost path every time you enter a node, but the searches from different nodes are not overlapping, so you end up running through the entire tree about three times. And that is without recursion and without any additional memory usage, just reusing `right` pointers that would go to waste otherwise.
+
+If you want your threaded pointers--and that will be more efficient--you can use the same algorithm to set them. We don't want to use recursion for setting these pointers, because if we could do that we didn't need all this troubly in the first place, and we don't need to:
+
+```python
+def thread(prev: Tree[T], next: Node[T]) -> None:
+    """Set prev's thread pointer if prev isn't None."""
+    if prev:
+        prev.thread = next
+
+
+def morris_thread(t: Tree[T]) -> None:
+    """In-order traversal of t."""
+    prev = None
+    while t:
+        if not t.left:
+            thread(prev, t)
+            prev, t = t, t.right
+        else:
+            right = rightmost(t.left, t)
+            if right.right == t:
+                thread(prev, t)
+                right.right = None
+                prev, t = t, t.right
+            else:
+                right.right = t
+                t = t.left
+```
+
+Once the pointers are set, you can traverse the nodes in-order by finding the left-most node and following threaded pointers from there:
+
+```python
+def leftmost(t: Tree[T]) -> Tree[T]:
+    """Find the left-most node in t."""
+    if t is None:
+        return None
+    while t.left:
+        t = t.left
+    return t
+
+
+def thread_traverse(t: Tree[T]) -> Iterator[T]:
+    """In-order traversal following threads."""
+    t = leftmost(t)
+    while t:
+        yield t.value
+        t = t.thread
+```
+
+
+
