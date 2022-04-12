@@ -182,4 +182,93 @@ I have put an implementation in `python/trees.py`, but before you look at it, I 
 
 (I made it look very difficult there, but it really isn't. In this case you can easily get it to work. My point was just that it is not *trivial* and that the things you need to deal with with an explicit stack are all the things you would also need with CPS but never worry about with a direct recursion).
 
+## Thunks and trampolines
+
+For an in-order traversal, an explicit stack is the right solution. It is simple, once you get the control flow right, and with a good stack implementation it is very efficient. But things can get a lot more complicated than this. You might have to traverse one tree, then for each node traverse another tree, for each pair of nodes do something complicated, and so on and so on... along the way, you have to keep track of where the program is at any time. If you are used to the normal function call mechanism for keeping track of the program's state, you are underestimating how much bookkeeping there is, but if you have to implement it using an explicit stack, you will soon find out.
+
+While continulation passing stile is more complicated than normal function calls, it does break what you have to do into small pieces that you can handle independently, and if you have to mix lots of different recursive traversals, you can still do this with simple building blocks, unlike if you have to store all the state in a stack you manage yourself.
+
+What I am trying to say is that you shouldn't write off CPS too quickly.
+
+CPS is often a bit slower than explicit stacks and a state-machine like the one we used with the stack, and with the trick below it is slower still, but from a programmer perspective it is much faster to code, and that matters as well. So, let's find out how we can use it, if the language we are programming in doesn't optimise tail calls.
+
+Before that, though, I will refactor the `cps()` function a bit, pulling out the inner functions and making generator functions for them instead:
+
+```python
+def handle_right(left: list[T], k: Cont[T]) -> Cont[T]:
+    """Make the 'go right' continuation."""
+    def cont(right: list[T]) -> list[T]:
+        """Continuation when we return from right."""
+        return k(concat(left, right))
+    return cont
+
+
+def handle_left(t: Tree[T], k: Cont[T]) -> Cont[T]:
+    """Make the 'go left' continuation."""
+    def cont(left: list[T]) -> list[T]:
+        """Continuation when we return from left."""
+        left.append(t.value)
+        return cps(t.right, handle_right(left, k))
+    return cont
+
+
+def cps(t: Tree[T], k: Cont[T] = lambda x: x) -> list[T]:
+    """Inorder traversal of a tree."""
+    return k([]) if t is None else cps(t.left, handle_left(t, k))
+```
+
+I didn't have to do this, but nested functions to make continuations is hard to read. Instead, the `handle_right()` and `handle_left()` functions take over the responsibility. They bind some program state when we call them with arguments, and the functions they return work as the closures we had before.
+
+I hope this is easier to read. At least it should be fairly easy to see that `cps()` either handles the base case by returning an empty list, or it goes left in the recursion to handle that. In `handle_left()` we get the result from the left, do the bit in-between the two recursive calls, and then go right, and in `handle_right()` we combine left and right and then return, calling `k` along the way to pass the control flow to the where our call wanted it.
+
+Of course, just because I split the function into three, I haven't gotten rid of the recursion and the growing call stack. I just have three functions that call each other instead of one recursive function. If I don't want to fill the call stack, then I have to stop making function calls. And that is the first trick. Instead of calling a function, we wrap up information about the function call--rather similar to what I just did above--and return that wrapped up information. If someone wants it later, they have to ask for it, and when they do, I will give them a little bit more, but never decent deep into the call stack.
+
+How do we wrap up a function call, so we have everything we need for the call but without calling it? We wrap it in a *thunk*.
+
+A *thunk* is a closure that doesn't take any arguments. So, this is a thunk: `lambda: 42`. I can call it, and get 42, but it doesn't run until I call it.
+
+Everytwhere you would start a chain of calls, turn that call into a thunk:
+
+```python
+# Shouldn't be Any but type checker can't handle cycles
+Thunk = Callable[[], Any]
+Cont = Callable[[T], Union[T, Thunk]]
+
+def handle_right(left: list[T], k: Cont[list[T]]) -> Cont[list[T]]:
+    """Make the 'go right' continuation."""
+    def cont(right: list[T]) -> Thunk:
+        """Continuation when we return from right."""
+        left.extend(right)
+        return lambda: k(left)
+    return cont
+
+def handle_left(t: Node[T], k: Cont[list[T]]) -> Cont[list[T]]:
+    """Make the 'go left' continuation."""
+    def cont(left: list[T]) -> Thunk:
+        """Continuation when we return from left."""
+        left.append(t.value)
+        return lambda: cps(t.right, handle_right(left, k))
+    return cont
+
+def cps(t: Tree[T], k: Cont[list[T]] = lambda x: x) -> Thunk:
+    """Inorder traversal of a tree."""
+    return lambda: (k([]) if t is None else cps(t.left, handle_left(t, k)))
+```
+
+Now, if you call `cps(trees)`, you won't get a list back, but a thunk. If you call it, it will execute one step of the calculation the old CPS function did and then return another thunk. Call that thunk, and another step is taken. You can continue going like that as long as you get thunks back, and when finally you get a list, that is your result. This part of the trick is called *the trampoline*--because thunks are jumping on the heap or something, I don't rightly know...
+
+```python
+def in_order(t: Tree[T]) -> list[T]:
+    """Compute the in-order traversal of t."""
+    thunk = cps(t)
+    while callable(thunk):
+        thunk = thunk()
+    return thunk
+```
+
+What the trick does is implicitly moving the stack frames to the heap--they are still there, just wrapped up in the closures--and then it lets you execute one frame at a time in the trampoline.
+
+Each continuation you write does one step of the calculation and returns a thunk that wraps up the next step. You often end up writing a lot of small functions for this, and it can be hard to get an overall picture of the control flow, but compared to an explicit stack, I usually find it easier to follow.
+
+Your milage may vary.
 

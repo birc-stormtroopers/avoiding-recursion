@@ -41,8 +41,6 @@ def inorder(t: Tree[T], acc: list[T] | None = None) -> list[T]:
     return acc
 
 
-print(inorder(tree))
-
 Cont = Callable[[list[T]], list[T]]
 
 
@@ -60,13 +58,11 @@ def cps(t: Tree[T], k: Cont[T] = lambda x: x) -> list[T]:
     def handle_value_and_right(left: list[T]) -> list[T]:
         def handle_right(right: list[T]) -> list[T]:
             return k(concat(left, right))
+        assert t is not None
         left.append(t.value)
         return cps(t.right, handle_right)
 
     return cps(t.left, handle_value_and_right)
-
-
-print(cps(tree))
 
 
 class Op(Enum):
@@ -76,6 +72,7 @@ class Op(Enum):
     These roughly correspond to the continuation points in
     the recursive solution.
     """
+
     TRAVERSE = 1
     EMIT = 2
 
@@ -86,15 +83,12 @@ def stack_traversal(t: Tree[T]) -> list[T]:
     res = []
     while stack:
         op, t = stack.pop()
-        match op:
-            case Op.EMIT:
-                res.append(t.value)
-            case Op.TRAVERSE:
-                if t:
-                    stack.append((Op.TRAVERSE, t.right))
-                    stack.append((Op.EMIT, t))
-                    stack.append((Op.TRAVERSE, t.left))
+        if op == Op.EMIT:
+            assert t is not None
+            res.append(t.value)
+        else:
+            if t:
+                stack.append((Op.TRAVERSE, t.right))
+                stack.append((Op.EMIT, t))
+                stack.append((Op.TRAVERSE, t.left))
     return res
-
-
-print(stack_traversal(tree))
