@@ -428,5 +428,49 @@ def thread_traverse(t: Tree[T]) -> Iterator[T]:
         t = t.thread
 ```
 
+## Using parent pointers
 
+If you have a `parent` pointer, a pointer from each child to its parent in the tree--something you will quite often have in many data structures--then you can also use it to traverse a tree without recursion.
+
+You can define your nodes like this, and let the constructor ensure that parent and child links are consistent:
+
+```python
+class Node(Generic[T]):
+    """Inner node of a tree."""
+
+    value: T
+    left: Tree[T]
+    right: Tree[T]
+    parent: Tree[T]
+
+    def __init__(self, value: T,
+                 left: Tree[T] = None,
+                 right: Tree[T] = None):
+        """Create a new node."""
+        self.value = value
+        self.left = left
+        if self.left:
+            self.left.parent = self
+        self.right = right
+        if self.right:
+            self.right.parent = self
+        self.parent = None
+
+
+# A tree is either a Node or None
+Tree = Optional[Node[T]]
+
+
+tree = Node(
+    'A',
+    Node('B', Node('D', right=Node('H')), Node('E')),
+    Node('C', Node('F'), Node('G', Node('I'), Node('J')))
+)
+```
+
+(There are some potential GC issues here, and if you buy my book I will tell you what they are. Otherwise, you can ignore them, they will never be a real problem).
+
+**Exercise:** Try to write a traversal algorithm that uses the `parent` pointer.
+
+I find that the easiest way to do this is via a small state machine that keep track of the traversal, but your milage may vary. You can find my solution in `python/parent.py`, but give it a good try before you look at my solution. Your solution might be even smarter.
 

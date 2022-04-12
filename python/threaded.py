@@ -66,10 +66,10 @@ def morris_traversal(t: Tree[T]) -> Iterator[T]:
 print(list(morris_traversal(tree)))
 
 
-def thread(prev: Tree[T], next: Node[T]) -> None:
+def thread(prev: Tree[T], next_node: Node[T]) -> None:
     """Set prev's thread pointer if prev isn't None."""
     if prev:
-        prev.thread = next
+        prev.thread = next_node
 
 
 def morris_thread(t: Tree[T]) -> None:
