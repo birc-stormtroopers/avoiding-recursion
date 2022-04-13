@@ -101,3 +101,24 @@ You can use it to traverse a tree like this:
 ```
 
 see `trampoline.go` for the full implementation.
+
+If you want to run the code in one of the two files you can use
+
+```sh
+> go run trees.go
+```
+
+or
+
+```sh
+> go run trampoline.go
+```
+
+or you can compile the code first and then run it with
+
+```sh
+> go build trees.go
+> ./trees
+```
+
+If you want to learn how to compile Go code in general, that will be a topic for another day.
