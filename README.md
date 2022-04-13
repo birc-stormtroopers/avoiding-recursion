@@ -474,3 +474,4 @@ tree = Node(
 
 I find that the easiest way to do this is via a small state machine that keep track of the traversal, but your milage may vary. You can find my solution in `python/parent.py`, but give it a good try before you look at my solution. Your solution might be even smarter.
 
+Traversing using a `parent` pointer can get a lot harder if the trees are not binary, since then you need to work out which child to traverse next when you return searching up through `parents`, but there are various ways to do it. Can you find a way?
