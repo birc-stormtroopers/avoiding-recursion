@@ -48,7 +48,7 @@ fn cps<'a, T: Copy>(t: &'a Tree<T>, res: &'a mut Vec<T>, k: K<'a, T>) -> Res<'a,
 }
 
 fn inorder<T: Copy>(t: &Tree<T>, res: &mut Vec<T>) {
-    let mut res = cps(t, res, Box::new(|_| Done));
+    let mut res = cps(t, res, cont(|_| Done));
     while let More(thunk) = res {
         res = thunk()
     }
