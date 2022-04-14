@@ -126,24 +126,31 @@ The problem is that after the first recursive call we need to go back to the cur
 It is these points between function calls that we call continuations in CPS. "First make a recursive call on the left, after that *continue* with appending the current node and then *continue* with the right recursive call."  CPS makes this explicit and a continuation passing style version could look like this:
 
 ```python
-def cps(t: Tree[T], k: Cont[T] = lambda x: x) -> list[T]:
-    if t is None:  # Base case, continue (call k) with an empty list
-        return k([])
+def cps_rec(t: Tree[T], acc: list[T], k: Callable[[], None]) -> None:
+    """CPS inorder traversal of a tree."""
+    if t is None:
+        return k()
 
-    def handle_value_and_right(left: list[T]) -> list[T]:
-        def handle_right(right: list[T]) -> list[T]:
-            return k(concat(left, right))
-        left.append(t.value)
-        return cps(t.right, handle_right)
+    def handle_value() -> None:
+        assert t is not None  # For the type-checker
+        acc.append(t.value)
+        return cps_rec(t.right, acc, k)
 
-    return cps(t.left, handle_value_and_right)
+    return cps_rec(t.left, acc, handle_value)
+
+
+def cps(t: Tree[T]) -> list[T]:
+    """Inorder traversal of a tree."""
+    res: list[T] = []
+    cps_rec(t, res, lambda: None)
+    return res
 ```
 
-Ignoring the base case, we need to call recursively on the left (the last line). We have two points we have to handle after we have the result from the left case, the two continuations, and the first of these is implemented in the function `handle_value_and_righ()`. When we call `cps(t.left, handle_value_and_right)` we are saying that this function should be called when we are done with the recursion on the left. The `handle_value_and_right()` function will be called with the result from the first recursion and it is responsible for what happens after that. It needs to append `t.value` and the recurse to the right, and the second recursion needs to know what to do once it is done, so we have to give it a continuation. That continuation is `handle_right()`, which will be called with the list we get from the second recursion. It will concatenate (in constant time, don't worry) the list from the left and from the right, and then it should return, which means that it calls the continuation `k` that the `cps()` function got.
+Ignoring the base case, we need to call recursively on the left (the last line in `cps_rec()`). We give this call a continuation to call when it is done with the left recursion, `handle_value()`, that will add the current value *after* the left recursion, and then recurse to the right. When the recursion is done on the right as well, we new to continue where our caller wants us to, which we do by calling `k()`.
 
 Yeah, I know it looks complicated, but you get used to it after a while, if you muck about with these things long enough.
 
-All the calls (except for `left.append(t.value)` which is constant time anyway) are tail calls, so if Python optimised these, we would only use space for one single stack frame and not a stack frame for each call.
+All the calls (except for `acc.append(t.value)` which is constant time anyway) are tail calls, so if Python optimised these, we would only use space for one single stack frame and not a stack frame for each call.
 
 Python doesn't, so this rewrite didn't get us anywhere. Except that there is another trick that solves the problem, but I will get to that a little later.
 
@@ -192,36 +199,31 @@ What I am trying to say is that you shouldn't write off CPS too quickly.
 
 CPS is often a bit slower than explicit stacks and a state-machine like the one we used with the stack, and with the trick below it is slower still, but from a programmer perspective it is much faster to code, and that matters as well. So, let's find out how we can use it, if the language we are programming in doesn't optimise tail calls.
 
-Before that, though, I will refactor the `cps()` function a bit, pulling out the inner functions and making generator functions for them instead:
+Before that, though, I will refactor the `cps()` function a bit, pulling out the inner function and making a generator functions for it instead:
 
 ```python
-def handle_right(left: list[T], k: Cont[T]) -> Cont[T]:
-    """Make the 'go right' continuation."""
-    def cont(right: list[T]) -> list[T]:
-        """Continuation when we return from right."""
-        return k(concat(left, right))
-    return cont
-
-
-def handle_left(t: Tree[T], k: Cont[T]) -> Cont[T]:
+def after_left(t: Node[T], acc: list[T], k: Cont) -> Cont:
     """Make the 'go left' continuation."""
-    def cont(left: list[T]) -> list[T]:
+    def cont() -> None:
         """Continuation when we return from left."""
-        left.append(t.value)
-        return cps(t.right, handle_right(left, k))
+        acc.append(t.value)
+        return cps(t.right, acc, k)
     return cont
 
 
-def cps(t: Tree[T], k: Cont[T] = lambda x: x) -> list[T]:
+def cps(t: Tree[T], acc: list[T], k: Cont) -> None:
     """Inorder traversal of a tree."""
-    return k([]) if t is None else cps(t.left, handle_left(t, k))
+    if t is None:
+        return k()
+    return cps(t.left, acc, after_left(t, acc, k))
+
 ```
 
-I didn't have to do this, but nested functions to make continuations is hard to read. Instead, the `handle_right()` and `handle_left()` functions take over the responsibility. They bind some program state when we call them with arguments, and the functions they return work as the closures we had before.
+I didn't have to do this, but nested functions to make continuations is hard to read. Instead, the `after_left()` function take over the responsibility. It binds some program state when we call it with arguments, and the function it returns work as the closure we had before.
 
-I hope this is easier to read. At least it should be fairly easy to see that `cps()` either handles the base case by returning an empty list, or it goes left in the recursion to handle that. In `handle_left()` we get the result from the left, do the bit in-between the two recursive calls, and then go right, and in `handle_right()` we combine left and right and then return, calling `k` along the way to pass the control flow to the where our call wanted it.
+I hope this is easier to read. At least it should be fairly easy to see that `cps()` either handles the base case by returning the result of `k()`, or it goes left in the recursion to handle that. 
 
-Of course, just because I split the function into three, I haven't gotten rid of the recursion and the growing call stack. I just have three functions that call each other instead of one recursive function. If I don't want to fill the call stack, then I have to stop making function calls. And that is the first trick. Instead of calling a function, we wrap up information about the function call--rather similar to what I just did above--and return that wrapped up information. If someone wants it later, they have to ask for it, and when they do, I will give them a little bit more, but never decent deep into the call stack.
+Of course, just because I split the function into two, I haven't gotten rid of the recursion and the growing call stack. I just have two functions that call each other instead of one recursive function. If I don't want to fill the call stack, then I have to stop making function calls. And that is the first trick. Instead of calling a function, we wrap up information about the function call--rather similar to what I just did above--and return that wrapped up information. If someone wants it later, they have to ask for it, and when they do, I will give them a little bit more, but never decent deep into the call stack.
 
 How do we wrap up a function call, so we have everything we need for the call but without calling it? We wrap it in a *thunk*.
 
@@ -230,40 +232,36 @@ A *thunk* is a closure that doesn't take any arguments. So, this is a thunk: `la
 Everytwhere you would start a chain of calls, turn that call into a thunk:
 
 ```python
-# Shouldn't be Any but type checker can't handle cycles
-Thunk = Callable[[], Any]
-Cont = Callable[[T], Union[T, Thunk]]
+Thunk = Callable[[], Union[None, Any]]
+Cont = Callable[[], Union[None, Thunk]]
 
-def handle_right(left: list[T], k: Cont[list[T]]) -> Cont[list[T]]:
-    """Make the 'go right' continuation."""
-    def cont(right: list[T]) -> Thunk:
-        """Continuation when we return from right."""
-        left.extend(right)
-        return lambda: k(left)
-    return cont
 
-def handle_left(t: Node[T], k: Cont[list[T]]) -> Cont[list[T]]:
+def after_left(t: Node[T], acc: list[T], k: Cont) -> Cont:
     """Make the 'go left' continuation."""
-    def cont(left: list[T]) -> Thunk:
+    def cont() -> Thunk:
         """Continuation when we return from left."""
-        left.append(t.value)
-        return lambda: cps(t.right, handle_right(left, k))
+        acc.append(t.value)
+        return lambda: cps(t.right, acc, k)
     return cont
 
-def cps(t: Tree[T], k: Cont[list[T]] = lambda x: x) -> Thunk:
+
+def cps(t: Tree[T], acc: list[T], k: Cont = lambda: None) -> Thunk:
     """Inorder traversal of a tree."""
-    return lambda: (k([]) if t is None else cps(t.left, handle_left(t, k)))
+    if t is None:
+        return k
+    return lambda: cps(t.left, acc, after_left(t, acc, k))
 ```
 
-Now, if you call `cps(trees)`, you won't get a list back, but a thunk. If you call it, it will execute one step of the calculation the old CPS function did and then return another thunk. Call that thunk, and another step is taken. You can continue going like that as long as you get thunks back, and when finally you get a list, that is your result. This part of the trick is called *the trampoline*--because thunks are jumping on the heap or something, I don't rightly know...
+Now, if you call `cps(trees, res)`, to fill the `res` list with the nodes in the tree, you won't get the list filled right away, but you will get a thunk. If you call it, it will execute one step of the calculation the old CPS function did and then return another thunk. Call that thunk, and another step is taken. You can continue going like that as long as you get thunks back, and when finally you get a list, that is your result. This part of the trick is called *the trampoline*--because thunks are jumping on the heap or something, I don't rightly know...
 
 ```python
 def in_order(t: Tree[T]) -> list[T]:
     """Compute the in-order traversal of t."""
-    thunk = cps(t)
+    res: list[T] = []
+    thunk = cps(t, res)
     while callable(thunk):
         thunk = thunk()
-    return thunk
+    return res
 ```
 
 What the trick does is implicitly moving the stack frames to the heap--they are still there, just wrapped up in the closures--and then it lets you execute one frame at a time in the trampoline.

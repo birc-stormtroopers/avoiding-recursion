@@ -41,28 +41,24 @@ def inorder(t: Tree[T], acc: list[T] | None = None) -> list[T]:
     return acc
 
 
-Cont = Callable[[list[T]], list[T]]
-
-
-def concat(x: list[T], y: list[T]) -> list[T]:
-    """Concatenate x and y."""
-    x.extend(y)
-    return x
-
-
-def cps(t: Tree[T], k: Cont[T] = lambda x: x) -> list[T]:
-    """Inorder traversal of a tree."""
+def cps_rec(t: Tree[T], acc: list[T], k: Callable[[], None]) -> None:
+    """CPS inorder traversal of a tree."""
     if t is None:
-        return k([])
+        return k()
 
-    def handle_value_and_right(left: list[T]) -> list[T]:
-        def handle_right(right: list[T]) -> list[T]:
-            return k(concat(left, right))
-        assert t is not None
-        left.append(t.value)
-        return cps(t.right, handle_right)
+    def handle_value() -> None:
+        assert t is not None  # For the type-checker
+        acc.append(t.value)
+        return cps_rec(t.right, acc, k)
 
-    return cps(t.left, handle_value_and_right)
+    return cps_rec(t.left, acc, handle_value)
+
+
+def cps(t: Tree[T]) -> list[T]:
+    """Inorder traversal of a tree."""
+    res: list[T] = []
+    cps_rec(t, res, lambda: None)
+    return res
 
 
 class Op(Enum):
