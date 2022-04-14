@@ -17,24 +17,28 @@ The `[T any]` says that `T` stands for any type and the `*node[T]` bits say that
 The CPS traversal looks much like the first version we had in Python:
 
 ```go
-func inorder[T any](t *node[T], k func([]T) []T) []T {
+func cps[T any](t *node[T], acc []T, k func([]T) []T) []T {
 	if t == nil {
-		return k([]T{})
+		return k(acc)
 	}
 
-	handleValueAndRight := func(left []T) []T {
-		handleRight := func(right []T) []T {
-			left = append(left, t.value)
-			return k(append(left, right...))
+	handleValueAndRight := func(acc []T) []T {
+		handleRight := func(acc []T) []T {
+			acc = append(acc, t.value)
+			return k(acc)
 		}
-		return inorder(t.right, handleRight)
+		return cps(t.right, acc, handleRight)
 	}
 
-	return inorder(t.left, handleValueAndRight)
+	return cps(t.left, acc, handleValueAndRight)
+}
+
+func inorder[T any](t *node[T]) []T {
+	return cps(t, []T{}, func(x []T) []T { return x })
 }
 ```
 
-The `[]T{}` is an empty "list" (a *slice* is what it is in Go) and `append(left, t.value)` works like `left.append(t.value)` in Python, and `append(left, right...)` works like `left.extend(right)`. A main difference is that `append` returns the new slice, which may or may not be the same as the old one--if it has to allocate more memory to fit new data into it, it returns a new object.
+The `[]T{}` is an empty "list" (a *slice* is what it is in Go) and `append(left, t.value)` works like `left.append(t.value)` in Python. A main difference is that `append` returns the new slice, which may or may not be the same as the old one--if it has to allocate more memory to fit new data into it, it returns a new object. Because the memory it points to can change along the way, we need to pass the latest reference along to all the function calls. Not a problem, of course, we just have a parameter with it, and we give it to the continuations.
 
 It might not be the fastest way to implement an in-order traversal in Go--an explicit stack would certainly be faster--but it illustrates how CPS can be used, and it is a cool tool to have if things get more complicated than this.
 
