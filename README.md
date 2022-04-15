@@ -189,6 +189,11 @@ I have put an implementation in `python/trees.py`, but before you look at it, I 
 
 (I made it look very difficult there, but it really isn't. In this case you can easily get it to work. My point was just that it is not *trivial* and that the things you need to deal with with an explicit stack are all the things you would also need with CPS but never worry about with a direct recursion).
 
+**Exercise:** Try implementing Fibonacci, `fib(n) -> fib(n - 1) + fib(n - 2)`, using an explicit stack.
+
+**Exercise:** Try implementing merge sort using an explicit stack.
+
+
 ## Thunks and trampolines
 
 For an in-order traversal, an explicit stack is the right solution. It is simple, once you get the control flow right, and with a good stack implementation it is very efficient. But things can get a lot more complicated than this. You might have to traverse one tree, then for each node traverse another tree, for each pair of nodes do something complicated, and so on and so on... along the way, you have to keep track of where the program is at any time. If you are used to the normal function call mechanism for keeping track of the program's state, you are underestimating how much bookkeeping there is, but if you have to implement it using an explicit stack, you will soon find out.
@@ -273,6 +278,10 @@ Your milage may vary.
 **Exercise:** In languages that do not have generators or co-routines, like Python does, this kind of computation is one way to get a similar effect. When we traverse the tree, we return thunks every time we have taken a step in the computation. But if we are returning from a call anyway, we could return more than a thunk. Try implementing a trampoline that lets you iterate over the nodes of a tree, in order.
 
 You can see my solution in `python/trampoline-generator.py`.
+
+**Exercise:** Try implementing Fibonacci `fib(n) -> fib(n - 1) + fib(n - 2)` using CPS.
+
+**Exercise:** Try implementing merge sort using CPS.
 
 ## Threading trees
 
