@@ -21,3 +21,4 @@ flags.make
 DependInfo.cmake
 compiler_depends.ts
 C/CMakeFiles/*
+C/fib

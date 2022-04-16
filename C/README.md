@@ -114,3 +114,146 @@ Since C doesn't have closures, we obviously cannot use them to implement a CPS s
 
 Implementing general closures that can do anything a closure in another language can do is highly complex. Dealing with the types that closures can have--what arguments they take, what they return, how long they live before we have to reclaim the resources the use is crazy complicated. But it isn't too hard to implement concrete kinds of closures for the specific application we have in mind.
 
+To make things simpler, we can start with computing the Fibonacci numbers. A version with direct recursion could look like this:
+
+```C
+int fib_direct(int n)
+{
+    return (n < 2) ? n : (fib_direct(n - 1) + fib_direct(n - 2));
+}
+```
+
+If we rewrite it a little, the return points from the recursions are clearer:
+
+```C
+int fib_direct(int n)
+{
+    if (n < 2)
+    {
+        return n;
+    }
+    else
+    {
+        int left = fib_direct(n - 1);
+        int right = fib_direct(n - 2);
+        return left + right;
+    }
+}
+```
+
+A CPS version would need to handle two continuations: when we return from the left recursion
+
+```C
+=>      int right = fib_direct(n - 2);
+        return left + right;
+```
+
+where we need to call the right recursion, and another when we return from the right recursion and need to add the two results
+
+```C
+=>      return left + right;
+```
+
+The continuations get the result from a recursive call, so an integer, and have to remember some context--the closure--which we have to implement explicitly. What the closures have to remember is an integer (`n` when we return from the left recursion, so we can recurse on the right, and the `left` result when we return from the right recursion so we can add the results) and they need to remember a continuation to call when they are done with their bits.
+
+So, we can implement a continuation/closure like this:
+
+```C
+// Closures need to remember some of these.
+struct frame
+{
+    int n;
+    struct closure *k;
+};
+typedef struct frame frame;
+
+// A continuation is an int -> int closure.
+typedef int (*cont_fn)(int, frame);
+
+// And a closure is a function + a frame.
+struct closure
+{
+    cont_fn f;
+    struct frame frame;
+};
+typedef struct closure closure;
+```
+
+A frame, what the closure remembers, is an integer and a closure, the functions in a closure takes an integer and a frame as argument and returns an integer, and a closure wraps a function together with a frame.
+
+To create and call closures, we can add some convinience functions:
+
+```C
+// Allocating and initialising a closure
+closure *new_closure(cont_fn f, int n, closure *k)
+{
+    closure *cl = malloc(sizeof *cl);
+    cl->f = f;
+    cl->frame = (frame){.n = n, .k = k};
+    return cl;
+}
+
+// Call closure, but free resources first
+int call_closure(closure *cl, int n)
+{
+    cont_fn f = cl->f;
+    frame frame = cl->frame;
+    free(cl);
+    return f(n, frame);
+}
+```
+
+I `malloc()` memory for closures, because I need the memory and can't put it on the stack. That means I also have to `free()` closures later. I've implemented it such that a closure is deleted when you call it. First we extract the data in it, so that doesn't get deleted, then we free the closure, and finally we call the function with the frame.
+
+Using `malloc()` and `free()` is not an efficient solution, but it is simple. A better solution would be to have a custom allocator, and because we create and call closures in a stack order, it isn't hard to write, but we will leave that for another day. For now, let's focus on how we use the closures.
+
+C's scope rules go "top-down" in the file, so if we want to call functions recursively we have to tell C that they exist with prototypes, so we do that first:
+
+```C
+// Fib CPS implementation
+static int done(int, frame);
+static int after_left(int, frame);
+static int after_right(int, frame);
+static int cps_rec(int, closure *);
+```
+
+The `done()` function is the one we will call when the recursion is done, the `after_left()` and `after_right()` functions should be self-explanatory, and the `cps_rec()` is not a continuation but the recursive function. It takes a continuation closure as an argument, while the closures take a `frame`.
+
+The actual implementation is straightforward:
+
+```C
+static int done(int n, frame frame)
+{
+    (void)frame; // silence lint warning
+    return n;
+}
+
+static int after_left(int left, frame frame)
+{
+    return cps_rec(frame.n - 2,
+                   new_closure(after_right, left, frame.k));
+}
+
+static int after_right(int right, frame frame)
+{
+    return call_closure(frame.k, right + frame.n);
+}
+
+static int cps_rec(int n, closure *k)
+{
+    if (n < 2)
+        return call_closure(k, n);
+    else
+        return cps_rec(n - 1, new_closure(after_left, n, k));
+}
+
+static int fib_cps(int n)
+{
+    return cps_rec(n, new_closure(done, 0, 0));
+}
+```
+
+If you compile this code with optimisation, you should get tail-call optimisation. At least [that is what I see.](https://godbolt.org/z/eq5EqMhY7). If you look at the generated assembly, ther are `jmp` instructions at the end of the functions instead of `ret`, in the cases where you have a tail-call. That means that we don't need to do anything else to avoid explicit recursion and for reducing the stack usage.
+
+It doesn't mean that this is as efficient as normal function calls. Calling a function through a pointer messes with the CPU's branch-prediction and that slows the execution down, by a lot, compared to jumping to a know location. So, using an explicit stack to keep track of the state of a recursion (or in the case of `fib()` not using much state at all since you only need two integers) will be faster. It can be more unmanagable, though, and then it is good to know that CPS can do the trick. Check the generated code, however! I have been bitten by cases where the compiler *didn't* do tail-call optimisation where I expected it to, and running out of stack space in C is an unpleasant experience.
+

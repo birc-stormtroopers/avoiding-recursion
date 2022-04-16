@@ -8,6 +8,9 @@ add_executable(dynarr_test dynarr_test.c)
 target_link_libraries(dynarr_test traversal)
 add_test(dynarr_test dynarr_test)
 
+add_executable(fib fib.c)
+add_test(fib fib)
+
 add_executable(traversal_test traversal_test.c)
 target_link_libraries(traversal_test traversal)
 add_test(traversal_test traversal_test)
