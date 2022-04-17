@@ -35,3 +35,13 @@ void append(dynarr *a, int i)
     }
     (*a)->data[(*a)->len++] = i;
 }
+
+dynarr append2(dynarr a, int i)
+{
+    if (a->len == a->cap)
+    {
+        a = realloc_dynarr(a, 2 * a->cap);
+    }
+    a->data[a->len++] = i;
+    return a;
+}

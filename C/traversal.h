@@ -15,6 +15,7 @@ struct dynarr_data
 
 dynarr new_dynarr(void);
 void append(dynarr *a, int i);
+dynarr append2(dynarr a, int i);
 
 // Binary trees. We don't have generics in C
 // (not without a lot of hacks at least) so the
@@ -31,5 +32,8 @@ void free_tree(tree t);
 
 // Direct recursion
 dynarr direct(tree t);
+
+// CPS traversal
+dynarr cps(tree t);
 
 #endif // TRAVERSAL_H

@@ -257,3 +257,86 @@ If you compile this code with optimisation, you should get tail-call optimisatio
 
 It doesn't mean that this is as efficient as normal function calls. Calling a function through a pointer messes with the CPU's branch-prediction and that slows the execution down, by a lot, compared to jumping to a know location. So, using an explicit stack to keep track of the state of a recursion (or in the case of `fib()` not using much state at all since you only need two integers) will be faster. It can be more unmanagable, though, and then it is good to know that CPS can do the trick. Check the generated code, however! I have been bitten by cases where the compiler *didn't* do tail-call optimisation where I expected it to, and running out of stack space in C is an unpleasant experience.
 
+Getting back to the tree traversal, we can implement that in a form that very closely resembles the Fibonacci calculation. We need closures that remember a tree and a continuation, instead of an integer and a continuation, and they will become functions from dynamic arrays to dynamic arrays, but otherwise nothing changes:
+
+```C
+// Closures need to remember some of these.
+struct frame
+{
+    tree t;
+    struct closure *k;
+};
+typedef struct frame frame;
+
+// A continuation is a dynarry -> dynarr closure.
+typedef dynarr (*cont_fn)(dynarr, frame);
+
+// And a closure is a function + a frame.
+struct closure
+{
+    cont_fn f;
+    struct frame frame;
+};
+typedef struct closure closure;
+
+// Allocating and initialising a closure
+closure *new_closure(cont_fn f, tree t, closure *k)
+{
+    closure *cl = malloc(sizeof *cl);
+    cl->f = f;
+    cl->frame = (frame){.t = t, .k = k};
+    return cl;
+}
+
+// Call closure, but free resources first
+dynarr call_closure(closure *cl, dynarr a)
+{
+    cont_fn f = cl->f;
+    frame frame = cl->frame;
+    free(cl);
+    return f(a, frame);
+}
+```
+
+The closures didn't have to return dynamic arrays, we could keep references to one and save it in closures or get them as arguments, but now I'm doing it this way.
+
+The traversal is, if anything, simpler than the `fib()` solution:
+
+```C
+// CPS traversal
+dynarr done(dynarr a, frame frame);
+dynarr after_left(dynarr a, frame frame);
+dynarr cps_rec(tree t, dynarr a, closure *k);
+
+dynarr done(dynarr a, frame frame)
+{
+    (void)frame; // Just for the linter
+    return a;
+}
+
+dynarr after_left(dynarr a, frame frame)
+{
+    return cps_rec(frame.t->right,
+                   append2(a, frame.t->value),
+                   frame.k);
+}
+
+dynarr cps_rec(tree t, dynarr a, closure *k)
+{
+    if (t == NULL)
+        return call_closure(k, a);
+    else
+        return cps_rec(t->left, a, new_closure(after_left, t, k));
+}
+
+dynarr cps(tree t)
+{
+    return cps_rec(t, new_dynarr(), new_closure(done, 0, 0));
+}
+```
+
+I'm using a new append function, `append2()`, that returns the updated dynamic array. It is slightly easier to use in this solution than the one that takes a pointer to a `dynarr` and doesn't return anything. You could use the old one instead, of course.
+
+
+
+If you are unlucky and the compiler doesn't optimise tail-calls, you can translate this version into one that uses a trampoline in much the same way as in Python. 
