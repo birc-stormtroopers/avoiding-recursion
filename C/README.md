@@ -205,7 +205,11 @@ int call_closure(closure *cl, int n)
 
 I `malloc()` memory for closures, because I need the memory and can't put it on the stack. That means I also have to `free()` closures later. I've implemented it such that a closure is deleted when you call it. First we extract the data in it, so that doesn't get deleted, then we free the closure, and finally we call the function with the frame.
 
-Using `malloc()` and `free()` is not an efficient solution, but it is simple. A better solution would be to have a custom allocator, and because we create and call closures in a stack order, it isn't hard to write, but we will leave that for another day. For now, let's focus on how we use the closures.
+Using `malloc()` and `free()` is not an efficient solution, but it is simple. Besides the inefficiency, it also holds the danger of leaking memory. If we do not call *all* the closures we allocate, some will not be deallocated, and that will leave resources unclaimed. That isn't a problem in this application, but it could be if we used these closures in something like a search where we would return early when we found what we were looking for.
+
+A better solution would be to have a custom allocator, and because we create and call closures in a stack order, it isn't hard to write, but we will leave that for another day.
+
+For now, let's focus on how we use the closures.
 
 C's scope rules go "top-down" in the file, so if we want to call functions recursively we have to tell C that they exist with prototypes, so we do that first:
 

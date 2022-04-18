@@ -106,6 +106,26 @@ You can use it to traverse a tree like this:
 
 see `trampoline.go` for the full implementation.
 
+## Channels and go-routines
+
+In Python we have generators (and more general co-routines) that we can use to create iterators when we traverse a data structure. They do not eliminate the problem of recursion, but they give us a nicer syntax, and we can hide a more efficient traversal behind a generator that then behaves just like an iterator.
+
+Go has syntactic suggar for traversing some times of objects
+
+```go
+   for a := range itr { ... }
+```
+
+that works for slices, maps, and such. It also works for *channels*, and we can create channels, write to them from one go-routines and read from another, and that gives us this nice syntax.
+
+Channels and go-routines certainly have their uses, but I don't traversal is one of them. Because go-routines and channels are aimed at concurrent execution, there is a massive synchronisation overhead in them. If your go-routine does a lot of work between providing an element to the channel, then the overhead is negligible, and you are fine, but for most traversal situations, using a channel will slow down the code *massively*.
+
+Another issue is resource allocation and reclaiming the resources again. The garbage collector in Go will free memory you are no longer using, but currently it doesn't figure out that you have a go-routine that won't ever interact with anyone again. If you have a go-routine and a channel it writes to, but at the other end you stop reading, maybe because you terminate a traversal early, the garbage collector won't recognise this. The producer go-routine will hang, because it cannot write any more, but it will not be reclaimed. There are ways around this, but it is complicated and far from automated, so it opens you up for leaks by accident *and* you don't get the nice interface with `for` and `range`.
+
+Go-routines and channels look very much like the right solution for this kind of traversal, but they really aren't. A home-made generator like the one above is a better solution. (Even better, in terms of efficiency, is an explicit stack, but that is only really useful in simple situations like the one we have, where the recursion is straightforward and we don't have to merge multiple recursive traversals into one, creating a large and unmanageble hunk of an explicit stack).
+
+## Running the code
+
 If you want to run the code in one of the two files you can use
 
 ```sh
