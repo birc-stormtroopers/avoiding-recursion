@@ -29,13 +29,22 @@ struct stack
     alignas(max_align_t) char data[];
 };
 
-typedef struct stack *stack;
+struct stack *new_stack(size_t frame_size);
+bool is_empty(struct stack **stack);
+void *pop(struct stack **stack);
+void push(struct stack **stack, void *frame);
 
-stack new_stack(size_t frame_size);
-bool is_empty(stack *stack);
-void *top(stack *stack);
-void *pop(stack *stack);
-void push(stack *stack, void *frame);
+// Approximating generic data structure. The type
+// check is rudamentary at best, but a little better
+// and safer than the generic interface.
+// clang-format off
+#define STACK(T)        struct { struct stack *stack; }
+#define NEW_STACK(T)    { .stack = new_stack(sizeof(T)) }
+#define IS_EMPTY(S)     is_empty(&(S).stack)
+#define POP(T, S)       (*(T *)pop(&(S).stack))
+#define PUSH(T, S, ...) push(&(S).stack, &(T){__VA_ARGS__})
+#define FREE_STACK(S)   free((S).stack)
+// clang-format on
 
 // Binary trees. We don't have generics in C
 // (not without a lot of hacks at least) so the

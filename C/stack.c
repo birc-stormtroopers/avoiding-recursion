@@ -6,7 +6,7 @@
 
 #define INIT_STACK_SIZE 8 // Don't(!!!) use zero
 
-stack new_stack(size_t frame_size)
+struct stack *new_stack(size_t frame_size)
 {
     struct stack *stack = malloc(offsetof(struct stack, data) + INIT_STACK_SIZE * frame_size);
     assert(stack);
@@ -16,21 +16,17 @@ stack new_stack(size_t frame_size)
     return stack;
 }
 
-bool is_empty(stack *stack)
+bool is_empty(struct stack **stack)
 {
     return (*stack)->len == 0;
 }
 
-void *top(stack *stack)
-{
-    return &(*stack)->data[((*stack)->len - 1) * (*stack)->frame_size];
-}
-void *pop(stack *stack)
+void *pop(struct stack **stack)
 {
     return &(*stack)->data[--(*stack)->len * (*stack)->frame_size];
 }
 
-void push(stack *stack, void *frame)
+void push(struct stack **stack, void *frame)
 {
     if ((*stack)->len == (*stack)->cap)
     {

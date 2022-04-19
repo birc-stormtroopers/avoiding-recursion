@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 project(tree-traversal)
 enable_testing()
 
-add_library(traversal dynarr.c tree.c stack.c stack_traversal.c)
+add_library(traversal traversal.h dynarr.c tree.c stack.c stack_traversal.c)
 
 add_executable(dynarr_test dynarr_test.c)
 target_link_libraries(dynarr_test traversal)

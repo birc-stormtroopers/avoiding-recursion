@@ -3,14 +3,19 @@
 
 int main(void)
 {
-    stack stack = new_stack(sizeof(int));
-    push(&stack, &(int){1});
-    push(&stack, &(int){2});
-    push(&stack, &(int){3});
+    // clang-format off
+    STACK(int) stack = NEW_STACK(int);
+    // clang-format on
 
-    assert(3 == *(int *)pop(&stack));
-    assert(2 == *(int *)pop(&stack));
-    assert(1 == *(int *)pop(&stack));
+    PUSH(int, stack, 1);
+    PUSH(int, stack, 2);
+    PUSH(int, stack, 3);
+
+    assert(3 == POP(int, stack));
+    assert(2 == POP(int, stack));
+    assert(1 == POP(int, stack));
+
+    FREE_STACK(stack);
 
     return 0;
 }
