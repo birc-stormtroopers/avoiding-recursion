@@ -391,14 +391,12 @@ If you always use closures in a stack-like fashion, then instead of calling one,
 Here's the CPS version of the tree traversal when we use a stack:
 
 ```C
-// clang-format off
 typedef STACK(struct thunk) thunk_stack;
 typedef void (*thunk_fn)(dynarr *a, thunk_stack stack, tree t);
 typedef struct thunk { thunk_fn fn; tree t; } thunk;
 
 static void traverse  (dynarr *a, thunk_stack stack, tree t);
 static void after_left(dynarr *a, thunk_stack stack, tree t);
-// clang-format on
 
 // Macros to make the intent of pushing clearer
 #define CALL(FN, T) PUSH(thunk, stack, .fn = FN, .t = T)
@@ -433,7 +431,6 @@ dynarr trampoline(tree t)
         thunk th = POP(thunk, stack);
         th.fn(&a, stack, th.t);
     }
-
     FREE_STACK(stack);
 
     return a;
