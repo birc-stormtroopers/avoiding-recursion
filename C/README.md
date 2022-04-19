@@ -421,17 +421,17 @@ static void after_left(dynarr *a, thunk_stack stack, tree t)
 dynarr trampoline(tree t)
 {
     dynarr a = new_dynarr();
-    if (!t)
-        return a;
-
-    thunk_stack stack = NEW_STACK(thunk);
-    PUSH(thunk, stack, .fn = traverse, .t = t);
-    while (!IS_EMPTY(stack))
+    if (t)
     {
-        thunk th = POP(thunk, stack);
-        th.fn(&a, stack, th.t);
+        thunk_stack stack = NEW_STACK(thunk);
+        PUSH(thunk, stack, .fn = traverse, .t = t);
+        while (!IS_EMPTY(stack))
+        {
+            thunk th = POP(thunk, stack);
+            th.fn(&a, stack, th.t);
+        }
+        FREE_STACK(stack);
     }
-    FREE_STACK(stack);
 
     return a;
 }

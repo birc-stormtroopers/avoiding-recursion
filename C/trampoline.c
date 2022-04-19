@@ -20,7 +20,8 @@ static void after_left(dynarr *a, thunk_stack stack, tree t);
 
 static void traverse(dynarr *a, thunk_stack stack, tree t)
 {
-    if (t) CALL_WITH_CONT(traverse, t->left, after_left, t);
+    if (t)
+        CALL_WITH_CONT(traverse, t->left, after_left, t);
 }
 
 static void after_left(dynarr *a, thunk_stack stack, tree t)
@@ -32,18 +33,17 @@ static void after_left(dynarr *a, thunk_stack stack, tree t)
 dynarr trampoline(tree t)
 {
     dynarr a = new_dynarr();
-    if (!t)
-        return a;
-
-    thunk_stack stack = NEW_STACK(thunk);
-    PUSH(thunk, stack, .fn = traverse, .t = t);
-    while (!IS_EMPTY(stack))
+    if (t)
     {
-        thunk th = POP(thunk, stack);
-        th.fn(&a, stack, th.t);
+        thunk_stack stack = NEW_STACK(thunk);
+        PUSH(thunk, stack, .fn = traverse, .t = t);
+        while (!IS_EMPTY(stack))
+        {
+            thunk th = POP(thunk, stack);
+            th.fn(&a, stack, th.t);
+        }
+        FREE_STACK(stack);
     }
-
-    FREE_STACK(stack);
 
     return a;
 }
