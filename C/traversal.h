@@ -68,4 +68,7 @@ dynarr cps(tree t);
 // Stack traversal
 dynarr stack_traversal(tree t);
 
+// Stack traversal
+dynarr trampoline(tree t);
+
 #endif // TRAVERSAL_H

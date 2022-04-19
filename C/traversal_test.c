@@ -28,12 +28,14 @@ int main(void)
     test_expected(direct, t, 5, (int[]){1, 2, 3, 4, 5});
     test_expected(cps, t, 5, (int[]){1, 2, 3, 4, 5});
     test_expected(stack_traversal, t, 5, (int[]){1, 2, 3, 4, 5});
+    test_expected(trampoline, t, 5, (int[]){1, 2, 3, 4, 5});
     free_tree(t);
 
     // 0 in expected is ignored but required by standard
     test_expected(direct, NULL, 0, (int[]){0});
     test_expected(cps, NULL, 0, (int[]){0});
     test_expected(stack_traversal, NULL, 0, (int[]){0});
+    test_expected(trampoline, NULL, 0, (int[]){0});
 
     return 0;
 }
