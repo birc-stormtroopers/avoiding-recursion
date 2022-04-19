@@ -341,6 +341,53 @@ dynarr cps(tree t)
 
 I'm using a new append function, `append2()`, that returns the updated dynamic array. It is slightly easier to use in this solution than the one that takes a pointer to a `dynarr` and doesn't return anything. You could use the old one instead, of course.
 
+If you are unlucky and the compiler doesn't optimise tail-calls, you can translate this version into one that uses a trampoline in much the same way as in Python. But since we are in C, we will try making an efficient solution as well. Before that, though, let's quickly consider the stack solution.
+
+## Explicit stack
+
+There is nothing special about the stack solution in C, except for how you implement a stack, and I suggest you don't look too closely at my implementation today.[^1] The solution looks like this:
+
+```C
+enum op { TRAVERSE, EMIT };
+struct frame { enum op op; tree t; };
+
+dynarr stack_traversal(tree t)
+{
+    dynarr a = new_dynarr();
+    STACK(struct frame) stack = NEW_STACK(struct frame);
+
+    PUSH(struct frame, stack, .op = TRAVERSE, .t = t);
+    while (!IS_EMPTY(stack))
+    {
+        struct frame frame = POP(struct frame, stack);
+        if (!frame.t)
+            continue;
+        switch (frame.op)
+        {
+        case TRAVERSE:
+            PUSH(struct frame, stack, .op = TRAVERSE, .t = frame.t->right);
+            PUSH(struct frame, stack, .op = EMIT, .t = frame.t);
+            PUSH(struct frame, stack, .op = TRAVERSE, .t = frame.t->left);
+            break;
+        case EMIT:
+            append(&a, frame.t->value);
+            break;
+        }
+    }
+    FREE_STACK(stack);
+
+    return a;
+}
+```
+
+There is nothing to it, but I want to write a trampoline version of the traversal based on this stack. The closures in the CPS are created and called in a stack-like fashion, which means that I can get a more efficient memory management, and one where freeing resources if I terminate earlier is a lot simpler.[^2] 
+
+I will use a stack where I push closures, and where I pop and call closures until the stack is empty. It does exactly what the code above does, and about as efficient as well, it just does so without a big hunking `switch`-statement to drive the control flow.
+
+## Thunks jumping up and down on the stack
 
 
-If you are unlucky and the compiler doesn't optimise tail-calls, you can translate this version into one that uses a trampoline in much the same way as in Python. 
+
+[^1]: C doesn't implement generics, but I have implemented a generic stack anyway, and naturally that can get a little tricky. To do this, you have to work with raw memory at a low level, and that might be a topic for another day, but it won't be today.
+
+[^2]: All the CPS examples we have seen create and call closures in the same stack-like way that direct recursion would, so naturally they can use a stack to store their data. Closures don't have to, of course--and you have all used closures in higher-order functions that are not used that way. This enables a very flexible control flow, where you can encode everything from normal function calls over exception-throwing semantics to general co-routines. But maybe that is better left for another day as well.
