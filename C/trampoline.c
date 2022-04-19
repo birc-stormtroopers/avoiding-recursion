@@ -44,6 +44,5 @@ dynarr trampoline(tree t)
         }
         FREE_STACK(stack);
     }
-
     return a;
 }
