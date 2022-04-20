@@ -16,7 +16,7 @@ static void after_left(dynarr *a, thunk_stack stack, tree t);
     {                                         \
         PUSH(thunk, stack, .fn = K, .t = TT); \
         PUSH(thunk, stack, .fn = FN, .t = T); \
-    } while (0);
+    } while (0)
 
 static void traverse(dynarr *a, thunk_stack stack, tree t)
 {

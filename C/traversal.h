@@ -37,18 +37,41 @@ void push(struct stack **stack, void *frame);
 // Approximating generic data structure. The type
 // check is rudamentary at best, but a little better
 // and safer than the generic interface.
-// clang-format off
-#define STACK(T)        struct { struct stack *stack; }
-#define NEW_STACK(T)    { .stack = new_stack(sizeof(T)) }
-#define IS_EMPTY(S)     is_empty(&(S).stack)
-#define POP(T, S)       (*(T *)pop(&(S).stack))
-#define PUSH(T, S, ...) push(&(S).stack, &(T){__VA_ARGS__})
-#define FREE_STACK(S)   free((S).stack)
-// clang-format on
+static inline void nop(bool b)
+{
+    // Doesn't do anything but turns a type-check into an expression that
+    // the compiler will remove. Ensures that we have the type of stack
+    // that we want to have.
+    (void)b;
+}
+// Checks that S is of type T by comparing pointers of that type.
+// This will be removed by the compiler when generating code because it
+// doesn't do anything.
+#define TYPECHECK(T, S) \
+    nop((S).typecheck == (T *)0)
+#define STACK(T)             \
+    struct                   \
+    {                        \
+        T *typecheck;        \
+        struct stack *stack; \
+    }
+#define NEW_STACK(T)                                     \
+    {                                                    \
+        .typecheck = NULL, .stack = new_stack(sizeof(T)) \
+    }
+#define IS_EMPTY(S) is_empty(&(S).stack)
+#define POP(T, S) (TYPECHECK(T, S), *(T *)pop(&(S).stack))
+#define PUSH(T, S, ...)                      \
+    do                                       \
+    {                                        \
+        TYPECHECK(T, S);                     \
+        push(&(S).stack, &(T){__VA_ARGS__}); \
+    } while (0)
+#define FREE_STACK(S) free((S).stack)
 
 // Binary trees. We don't have generics in C
 // (not without a lot of hacks at least) so the
-// tree is hardwired to have ints as values.
+// tree is just hardwired to have ints as values.
 typedef struct node *tree;
 struct node
 {

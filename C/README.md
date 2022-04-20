@@ -405,7 +405,7 @@ static void after_left(dynarr *a, thunk_stack stack, tree t);
     {                                         \
         PUSH(thunk, stack, .fn = K, .t = TT); \
         PUSH(thunk, stack, .fn = FN, .t = T); \
-    } while (0);
+    } while (0)
 
 static void traverse(dynarr *a, thunk_stack stack, tree t)
 {
@@ -438,7 +438,7 @@ dynarr trampoline(tree t)
 
 I hope you agree that it isn't frightfully more complicated than the explicit stack version. It is a little more complicated since we have had to move the two `case`-statements from the `switch` into separate functions, and therein lies both the pro and con of using this technique.
 
-If you have something as simple as an in-order tree traversal, then an explicit stack is easy to manage, and it just gets more complicated if you split some of the code's logic into separate functions. However, in more complicated applications, where you may have interleaved computations that call each other--an approximate pattern matching where one recursion explores different patterns and another explores an index structure comes to mind for those who've taken GSA--a bit `switch`-statement also becomes unmanageable. There, it is sometimes easier to keep the different logically connected parts of the traversal together and not mixed in a `switch`, and if you do that with thunks you can still interleave them the way we just saw. 
+If you have something as simple as an in-order tree traversal, then an explicit stack is easy to manage, and it just gets more complicated if you split some of the code's logic into separate functions. However, in more complicated applications, where you may have interleaved computations that call each other--an approximate pattern matching where one recursion explores different patterns and another explores an index structure comes to mind for those who've taken GSA--a big `switch`-statement also becomes unmanageable. There, it is sometimes easier to keep the different logically connected parts of the traversal together and not mixed in a `switch`, and if you do that with thunks you can still interleave them the way we just saw. 
 
 
 
