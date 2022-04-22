@@ -3,7 +3,9 @@ project(tree-traversal)
 enable_testing()
 
 add_library(traversal 
-    traversal.h dynarr.c tree.c stack.c stack_traversal.c trampoline.c)
+    traversal.h 
+    dynarr.c tree.c stack.c 
+    stack_traversal.c trampoline.c)
 
 add_executable(dynarr_test dynarr_test.c)
 target_link_libraries(dynarr_test traversal)
@@ -19,3 +21,7 @@ add_test(fib fib)
 add_executable(traversal_test traversal_test.c)
 target_link_libraries(traversal_test traversal)
 add_test(traversal_test traversal_test)
+
+add_executable(threaded_test threaded.c)
+target_link_libraries(threaded_test traversal)
+add_test(threaded_test threaded_test)

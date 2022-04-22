@@ -440,8 +440,112 @@ I hope you agree that it isn't frightfully more complicated than the explicit st
 
 If you have something as simple as an in-order tree traversal, then an explicit stack is easy to manage, and it just gets more complicated if you split some of the code's logic into separate functions. However, in more complicated applications, where you may have interleaved computations that call each other--an approximate pattern matching where one recursion explores different patterns and another explores an index structure comes to mind for those who've taken GSA--a big `switch`-statement also becomes unmanageable. There, it is sometimes easier to keep the different logically connected parts of the traversal together and not mixed in a `switch`, and if you do that with thunks you can still interleave them the way we just saw. 
 
+## Threaded trees
+
+Let's consider threaded trees again. You can implement these in C the same way as you would in any other language, but because C is as low-level as it is, there is a trick that I will use this time. Strictly speaking, the C standard doesn't guarantee that this will work, but in practise it does.
+
+I will make a binary tree where a structure has two child pointers, just as before. But if the alignment of a struct is greater than 1, meaning that it can't sit on all addresses but only certain offsets, or if all nodes are allocated with `malloc()` where the alignment will be higher, then the lowest bit in the word that contains a pointer to a node will always be zero.[^3]
+
+If the lowest bit is always zero, I don't have to keep it as zero. I can use it to encode one bit of information. I just have to remember to set it to zero every time I want to use it as a pointer. This trick, used in many virtual machines, is called *tagged pointers* and we can implement them like this:
+
+```C
+typedef struct ttree *ttree;
+typedef uintptr_t tptr; // A "tagged" pointer
+
+struct ttree
+{
+    int value;
+    tptr left, right;
+};
+
+static inline tptr  as_tptr(ttree t)       { return (tptr)t;                      }
+static inline tptr  tag(ttree t, bool tag) { return t ? (tptr)t | tag : 0;        }
+
+static inline bool  is_tagged(tptr p)      { return (p & (tptr)1);                }
+static inline ttree as_ptr(tptr p)         { return (ttree)(p & ~(tptr)1);        }
+static inline ttree as_true_ptr(tptr p)    { return is_tagged(p) ? 0 : as_ptr(p); }
+```
+
+You can try to decipher the functions if you want, but it suffices to know that `as_tptr()` makes a pointer into a tagged pointer with the tag set to `false`, `tag()` explicitly sets the tag on the pointer, `is_tagged()` returns the boolean value of the tag, `as_ptr()` translates a tagged pointer bag into a pointer by masking away the tag, and `as_true_ptr()` gives us the underlying pionter, but only if the tag is `false`.
+
+Both the left and right child can be tagged here (but I will only show a use for the right children with threaded pointers). You can use it to do a traversal left to right as well as right to left, if you thread in both directions.
+
+Anyway, if you want to find the rightmost or leftmost child in a tree, you can just run down the `left` or `right` pointers as before, except that if you have tagged pointers you shouldn't follow them. So where you would normally just run along the `t->right` or `t->left` pointers, you need to get the "true" pointers instead. Otherwise, the code works just as it would without threaded nodes.
+
+```C
+static inline ttree rightmost(tptr p)
+{
+    ttree t = as_true_ptr(p), right;
+    while ((right = as_true_ptr(t->right)))
+        t = right;
+    return t;
+}
+
+static inline ttree leftmost(tptr p)
+{
+    ttree t = as_true_ptr(p), left;
+    while ((left = as_true_ptr(t->left)))
+        t = left;
+    return t;
+}
+```
+
+You can set the threaded pointers using a Morris traversal, avoiding recursion, and using that you can recognise if you have already visited a node by checking if its rightmost node's `right` pointer is threaded.
+
+```C
+// Do a Morris traversal to connect all leave's right-child
+// to the next in-order node
+static void thread_tree(ttree t)
+{
+    ttree prev = 0;
+    while (t)
+    {
+        if (t->left && (prev = rightmost(t->left)) && !is_tagged(prev->right))
+        {
+            prev->right = tag(t, true); // First time we got to prev, so thread it
+            t = as_ptr(t->left);        // continue left
+        }
+        else
+        {
+            t = as_ptr(t->right);
+        }
+    }
+}
+```
+
+If you also want to thread the left children you can do the symmetric procedure.
+
+Once you have a threaded tree, traversing it is as simple as:
+
+```C
+static dynarr threaded_traversal(ttree t)
+{
+    dynarr a = new_dynarr();
+
+    while (t)
+    {
+        t = leftmost(as_tptr(t));
+        append(&a, t->value);
+        if (t->right && is_tagged(t->right))
+        {
+            // Go to the ancestor and emit from it,
+            // then we go to its right child when we
+            // go right later
+            t = as_ptr(t->right);
+            append(&a, t->value);
+        }
+        t = as_ptr(t->right);
+    }
+
+    return a;
+}
+```
+
+
 
 
 [^1]: C doesn't implement generics, but I have implemented a generic stack anyway, and naturally that can get a little tricky. To do this, you have to work with raw memory at a low level, and that might be a topic for another day, but it won't be today.
 
 [^2]: All the CPS examples we have seen create and call closures in the same stack-like way that direct recursion would, so naturally they can use a stack to store their data. Closures don't have to, of course--and you have all used closures in higher-order functions that are not used that way. This enables a very flexible control flow, where you can encode everything from normal function calls over exception-throwing semantics to general co-routines. But maybe that is better left for another day as well.
+
+[^3]: The alignment of our structs will be greater than one because it contains integers and pointers, but all this alignment stuff is something I can tell you about another day.

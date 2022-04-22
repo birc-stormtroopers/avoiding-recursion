@@ -39,3 +39,6 @@ C/tree-traversal.build/Debug/traversal_test.build/Objects-normal/x86_64/traversa
 C/tree-traversal.build/Debug/ZERO_CHECK.build/Script-AB1062A1B11E1FF9F0456B71.sh
 C/.vscode/settings.json
 C/stack_test
+C/Testing/Temporary/LastTest.log.tmp
+C/Testing/Temporary/CTestCheckpoint.txt
+C/threaded_test
