@@ -528,9 +528,6 @@ static dynarr threaded_traversal(ttree t)
         append(&a, t->value);
         if (t->right && is_tagged(t->right))
         {
-            // Go to the ancestor and emit from it,
-            // then we go to its right child when we
-            // go right later
             t = as_ptr(t->right);
             append(&a, t->value);
         }
